@@ -41,7 +41,9 @@ export interface Comment {
 
 export interface Notification {
   id: string;
-  type: "like" | "comment" | "reply" | "mention";
+  type: "like" | "comment" | "reply" | "mention" | "follow";
+  title: string;
+  message: string;
   seen: boolean;
   createdAt: Date;
   actorId: string; // User who triggered the notification
@@ -49,4 +51,11 @@ export interface Notification {
   recipientId: string; // User receiving the notification
   postId?: string;
   commentId?: string;
+  link?: string; // Navigation link when clicked
+}
+
+export interface AppState {
+  posts: Post[];
+  notifications: Notification[];
+  users: User[];
 }

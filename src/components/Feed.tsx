@@ -12,6 +12,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Filter } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Sample data - in a real app, this would come from an API
 const sampleUsers: User[] = [
@@ -168,19 +169,82 @@ interface FeedProps {
 type FilterType = "all" | "seniors" | "juniors";
 
 const Feed = ({ currentUser }: FeedProps) => {
-  const [posts, setPosts] = useState<PostType[]>(samplePosts);
+  const [posts, setPosts] = useState<PostType[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<"latest" | "popular">("latest");
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
   
   // Simulate loading posts from API
   useEffect(() => {
     // In a real app, you'd fetch posts from your backend
-  }, []);
+    const fetchPosts = async () => {
+      try {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Check if we have stored posts in localStorage
+        const storedPosts = localStorage.getItem('posts');
+        
+        if (storedPosts) {
+          // Parse stored posts and convert date strings back to Date objects
+          const parsedPosts = JSON.parse(storedPosts, (key, value) => {
+            if (key === 'createdAt' || key === 'updatedAt') {
+              return new Date(value);
+            }
+            return value;
+          });
+          setPosts(parsedPosts);
+        } else {
+          // Use sample data if no stored posts
+          setPosts(samplePosts);
+          // Save sample data to localStorage
+          savePosts(samplePosts);
+        }
+      } catch (error) {
+        console.error('Error loading posts:', error);
+        toast({
+          title: "Error loading posts",
+          description: "Could not load posts. Please try again later.",
+          variant: "destructive"
+        });
+        // Fallback to sample data in case of error
+        setPosts(samplePosts);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchPosts();
+  }, [toast]);
+  
+  // Save posts to localStorage
+  const savePosts = (postsToSave: PostType[]) => {
+    localStorage.setItem('posts', JSON.stringify(postsToSave));
+  };
   
   // Handle creating a new post
   const handlePostCreated = (newPost: PostType) => {
-    setPosts([newPost, ...posts]);
+    const updatedPosts = [newPost, ...posts];
+    setPosts(updatedPosts);
+    savePosts(updatedPosts);
+  };
+  
+  // Handle updating a post (likes, comments)
+  const handlePostUpdate = (updatedPost: PostType) => {
+    const updatedPosts = posts.map(post => 
+      post.id === updatedPost.id ? updatedPost : post
+    );
+    setPosts(updatedPosts);
+    savePosts(updatedPosts);
+  };
+  
+  // Handle deleting a post
+  const handlePostDelete = (postId: string) => {
+    const updatedPosts = posts.filter(post => post.id !== postId);
+    setPosts(updatedPosts);
+    savePosts(updatedPosts);
   };
   
   // Filter posts based on selection
@@ -246,7 +310,17 @@ const Feed = ({ currentUser }: FeedProps) => {
       
       {/* Posts */}
       <div className="space-y-6">
-        {sortedPosts.length === 0 ? (
+        {isLoading ? (
+          // Loading state
+          <div className="space-y-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse">
+                <div className="h-24 bg-muted rounded-lg mb-2"></div>
+                <div className="h-64 bg-muted rounded-lg"></div>
+              </div>
+            ))}
+          </div>
+        ) : sortedPosts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No posts found. Adjust your filters or be the first to post!</p>
           </div>
@@ -256,6 +330,8 @@ const Feed = ({ currentUser }: FeedProps) => {
               key={post.id} 
               post={post} 
               currentUser={currentUser}
+              onPostUpdate={handlePostUpdate}
+              onPostDelete={handlePostDelete}
             />
           ))
         )}

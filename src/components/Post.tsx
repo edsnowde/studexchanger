@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { User, Post as PostType, Comment as CommentType } from "@/utils/types";
@@ -23,47 +22,122 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 
 interface PostProps {
   post: PostType;
   currentUser?: User;
+  onPostUpdate?: (updatedPost: PostType) => void;
+  onPostDelete?: (postId: string) => void;
 }
 
-const Post = ({ post, currentUser }: PostProps) => {
-  const [liked, setLiked] = useState(post.likes.includes(currentUser?.id || ""));
+const Post = ({ post, currentUser, onPostUpdate, onPostDelete }: PostProps) => {
+  const [isLiked, setIsLiked] = useState(post.likes.includes(currentUser?.id || ""));
+  const [likeCount, setLikeCount] = useState(post.likes.length);
   const [showComments, setShowComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [comments, setComments] = useState<CommentType[]>(post.comments || []);
+  const { toast } = useToast();
   
   const handleLike = () => {
-    setLiked(!liked);
+    if (!currentUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to like posts",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const newIsLiked = !isLiked;
+    setIsLiked(newIsLiked);
+    
+    // Update like count
+    setLikeCount(prev => newIsLiked ? prev + 1 : prev - 1);
+    
+    // Create updated post object
+    const updatedLikes = newIsLiked 
+      ? [...post.likes, currentUser.id]
+      : post.likes.filter(id => id !== currentUser.id);
+      
+    const updatedPost = { ...post, likes: updatedLikes };
+    
+    // Call the update function
+    if (onPostUpdate) {
+      onPostUpdate(updatedPost);
+    }
+    
     // In a real app, you'd send this to your API
+    toast({
+      title: newIsLiked ? "Post liked" : "Post unliked",
+      variant: "default"
+    });
   };
   
   const handleComment = () => {
+    if (!currentUser) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to comment on posts",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!newComment.trim()) return;
     
     const comment: CommentType = {
       id: Date.now().toString(),
       content: newComment,
       createdAt: new Date(),
-      authorId: currentUser?.id || "",
+      authorId: currentUser.id,
       author: currentUser,
       postId: post.id,
       likes: [],
     };
     
-    setComments([...comments, comment]);
+    const updatedComments = [...comments, comment];
+    setComments(updatedComments);
     setNewComment("");
+    
+    // Create updated post object
+    const updatedPost = { ...post, comments: updatedComments };
+    
+    // Call the update function
+    if (onPostUpdate) {
+      onPostUpdate(updatedPost);
+    }
+    
     // In a real app, you'd send this to your API
+    toast({
+      title: "Comment added",
+      variant: "default"
+    });
   };
   
   const handleDelete = () => {
-    // In a real app, you'd send this to your API
-    console.log("Deleting post:", post.id);
+    if (!currentUser || currentUser.id !== post.authorId) {
+      toast({
+        title: "Permission denied",
+        description: "You can only delete your own posts",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Call the delete function
+    if (onPostDelete) {
+      onPostDelete(post.id);
+      
+      toast({
+        title: "Post deleted",
+        description: "Your post has been removed",
+        variant: "default"
+      });
+    }
   };
 
-  const isAuthor = currentUser?.id === post.author?.id;
+  const isAuthor = currentUser?.id === post.authorId;
   
   return (
     <Card className="mb-6 overflow-hidden transition-all hover:shadow-md">
@@ -158,11 +232,11 @@ const Post = ({ post, currentUser }: PostProps) => {
           <div className="flex border-b">
             <Button 
               variant="ghost" 
-              className={`flex-1 gap-2 rounded-none py-5 ${liked ? 'text-red-500' : ''}`} 
+              className={`flex-1 gap-2 rounded-none py-5 ${isLiked ? 'text-red-500' : ''}`} 
               onClick={handleLike}
             >
-              <Heart className={`h-5 w-5 ${liked ? 'fill-current' : ''}`} />
-              <span>{post.likes.length + (liked && !post.likes.includes(currentUser?.id || "") ? 1 : 0)}</span>
+              <Heart className={`h-5 w-5 ${isLiked ? 'fill-current' : ''}`} />
+              <span>{likeCount}</span>
             </Button>
             
             <Button 
@@ -224,7 +298,7 @@ const Post = ({ post, currentUser }: PostProps) => {
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={currentUser?.avatar} />
                   <AvatarFallback className="bg-purple-100 text-purple-800">
-                    {currentUser?.name.charAt(0)}
+                    {currentUser?.name.charAt(0) || "?"}
                   </AvatarFallback>
                 </Avatar>
                 
@@ -241,7 +315,7 @@ const Post = ({ post, currentUser }: PostProps) => {
                       }
                     }}
                   />
-                  <Button size="icon" onClick={handleComment} disabled={!newComment.trim()}>
+                  <Button size="icon" onClick={handleComment} disabled={!newComment.trim() || !currentUser}>
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
