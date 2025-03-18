@@ -1,6 +1,5 @@
 
 import { useState } from "react";
-import { useParams } from "react-router-dom";
 import { User, Post as PostType } from "@/utils/types";
 import Post from "./Post";
 import { Edit, MapPin, Calendar, Briefcase, Mail } from "lucide-react";
@@ -18,19 +17,14 @@ import {
 import { format } from "date-fns";
 
 interface ProfileProps {
+  user: User;
   currentUser?: User;
   userPosts: PostType[];
+  onPostUpdate?: (updatedPost: PostType) => void;
+  onPostDelete?: (postId: string) => void;
 }
 
-const Profile = ({ currentUser, userPosts }: ProfileProps) => {
-  const { id } = useParams();
-  const [user, setUser] = useState<User | undefined>(currentUser);
-  
-  // In a real app, you'd fetch the user data if the ID doesn't match the current user
-  // For now, we'll use the current user as a placeholder
-  
-  if (!user) return <div>Loading...</div>;
-  
+const Profile = ({ user, currentUser, userPosts, onPostUpdate, onPostDelete }: ProfileProps) => {
   const isOwnProfile = currentUser?.id === user.id;
   
   return (
@@ -125,6 +119,8 @@ const Profile = ({ currentUser, userPosts }: ProfileProps) => {
                   key={post.id} 
                   post={post} 
                   currentUser={currentUser}
+                  onPostUpdate={onPostUpdate}
+                  onPostDelete={onPostDelete}
                 />
               ))}
             </div>
